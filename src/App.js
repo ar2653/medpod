@@ -1,8 +1,12 @@
+import React from 'react';
+import { Layout } from 'antd';
+import Sidebar from './components/Sidebar/Sidebar.js';
+
 function App() {
   return (
-    <div className="App">
-      <p>App is working</p>
-    </div>
+    <Layout className="App">
+      <Sidebar />
+    </Layout>
   );
 }
 

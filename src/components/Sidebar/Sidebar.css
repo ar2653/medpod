@@ -1,0 +1,44 @@
+/* Layout Styles */
+.layout-container {
+  display: flex;
+  height: 100vh;
+}
+
+.sider {
+  overflow: auto;
+  height: 100vh;
+  position: fixed;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  scrollbar-width: thin;
+  background: #001529;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px; 
+  background: #001529; 
+  color: #fff; 
+  font-size: 20px; 
+  font-weight: bold; 
+  padding: 16px; 
+}
+
+.header {
+  padding: 0;
+  background: var(--color-bg-container);
+}
+
+.content {
+  margin: 0 16px;
+}
+
+.content-inner {
+  padding: 24px;
+  min-height: 360px;
+  background: var(--color-bg-container);
+  border-radius: var(--border-radius-lg);
+}
