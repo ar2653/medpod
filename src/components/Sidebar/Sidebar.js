@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons';
 import { Layout, Menu, Typography } from 'antd';
 import './Sidebar.css';
+import AudioStream from '../AudioStream/AudioStream';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -48,7 +49,7 @@ const Sidebar = () => {
         </Header>
         <Content className="content">
           <div className="content-inner">
-            Content goes here
+            <AudioStream/>
           </div>
         </Content>
       </Layout>
