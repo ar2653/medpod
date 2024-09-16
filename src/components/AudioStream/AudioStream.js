@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Button, Layout, Select } from "antd";
 import { AudioOutlined } from "@ant-design/icons";
+import io from "socket.io-client";
 import "./AudioStream.css";
+
 
 const { Content } = Layout;
 const { Option } = Select;
+
+const socket = io("http://localhost:5001", {
+  transports: ["websocket"],
+});
 
 const AudioStream = () => {
   const [isTransmitting, setIsTransmitting] = useState(false);
@@ -19,6 +25,13 @@ const AudioStream = () => {
       );
       setDevices(audioDevices);
     });
+
+    // socket
+    socket.on("audio-data", (data) => {
+      console.log("Audio data received to FE");
+      // playAudio(data);
+    });
+
   }, []);
 
   const startTransmission = async () => {
@@ -33,6 +46,10 @@ const AudioStream = () => {
       console.error("Error accessing media devices.", err);
     }
   };
+
+  // stop transmission function goes here
+
+  // play audio function
 
   return (
     <Layout className="audio-stream-layout">
