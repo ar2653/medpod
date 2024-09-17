@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button, Layout, Select } from "antd";
 import { AudioOutlined } from "@ant-design/icons";
 import io from "socket.io-client";
@@ -16,6 +16,9 @@ const AudioStream = () => {
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
+  const [audioContext, setAudioContext] = useState(null);
+  const workletNodeRef = useRef(null);
+  const mediaStreamSourceRef = useRef(null);
 
   useEffect(() => {
     // Get audio devices
@@ -26,12 +29,30 @@ const AudioStream = () => {
       setDevices(audioDevices);
     });
 
+    // Audio worker
+    const loadAudioWorklet = async () => {
+      try {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        setAudioContext(context);
+        if (context.state === 'suspended') {
+          await context.resume();
+        }
+        await context.audioWorklet.addModule('audio-processor.js');
+      } catch (error) {
+        console.error("Error loading AudioWorklet module", error);
+      }
+    };
+    loadAudioWorklet();
+
     // socket
     socket.on("audio-data", (data) => {
       console.log("Audio data received to FE");
-      // playAudio(data);
+      playAudio(data);
     });
 
+    return () => {
+      socket.off("audio-data");
+    };
   }, []);
 
   const startTransmission = async () => {
@@ -41,15 +62,80 @@ const AudioStream = () => {
     }
 
     try {
-        // stream audio
+      // Load worker
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      setAudioContext(context);
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+      await context.audioWorklet.addModule('audio-processor.js');
+      // Create Stream and AudioWorker
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: selectedDevice },
+      });
+
+      const source = context.createMediaStreamSource(stream);
+      const workletNode = new AudioWorkletNode(context, 'audio-processor');
+
+      source.connect(workletNode);
+      workletNode.connect(context.destination);
+
+      // Handle messages from AudioWorkletProcessor
+      workletNode.port.onmessage = (event) => {
+        const audioData = event.data;
+        console.log("Emitting audio data to server from client (React app)");
+        socket.emit("audio-data", audioData);
+      };
+
+      workletNode.port.postMessage('start');
+
+      // Store references to manage stopping later
+      mediaStreamSourceRef.current = source;
+      workletNodeRef.current = workletNode;
+
     } catch (err) {
       console.error("Error accessing media devices.", err);
     }
   };
 
   // stop transmission function goes here
+  const stopTransmission = () => {
+    if (audioContext) {
+      if (mediaStreamSourceRef.current) {
+        mediaStreamSourceRef.current.disconnect();
+      }
+      if (workletNodeRef.current) {
+        workletNodeRef.current.disconnect();
+      }
+      audioContext.close().then(() => {
+        console.log("Audio context closed");
+      }).catch((error) => {
+        console.error("Error closing audio context", error);
+      });
+      // Stop emitting data to the server
+      socket.off("audio-data");
+      setAudioContext(null);
+    }
+    setIsTransmitting(false);
+  };
 
   // play audio function
+  const playAudio = (data) => {
+    if (audioContext) {
+      try {
+        const audioBuffer = new Float32Array(data);
+        const buffer = audioContext.createBuffer(1, audioBuffer.length, audioContext.sampleRate);
+        buffer.copyToChannel(audioBuffer, 0);
+
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start();
+      } catch (error) {
+        console.error("Error playing audio", error);
+      }
+    }
+  };
 
   return (
     <Layout className="audio-stream-layout">
@@ -71,8 +157,12 @@ const AudioStream = () => {
               icon={<AudioOutlined />}
               type={isTransmitting ? "primary" : "default"}
               onClick={() => {
+                if (isTransmitting) {
+                  stopTransmission();
+                } else {
+                  startTransmission();
+                }
                 setIsTransmitting(!isTransmitting);
-                startTransmission();
               }}
             >
               {isTransmitting ? "Stop Transmission" : "Start Transmission"}
